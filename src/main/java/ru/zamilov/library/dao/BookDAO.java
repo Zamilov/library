@@ -1,13 +1,12 @@
 package ru.zamilov.library.dao;
 
-import javafx.util.Pair;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.zamilov.library.models.Book;
 
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -16,8 +15,12 @@ import java.util.stream.Collectors;
 @Component
 public class BookDAO {
     private final JdbcTemplate jdbcTemplate;
+    private static Integer id;
+
     public BookDAO(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        id = jdbcTemplate.queryForObject("SELECT MAX(id) FROM book", Integer.class);
+        if (id == null) id = 0;
     }
 
     /**
@@ -29,22 +32,22 @@ public class BookDAO {
 
     /**
      * Добавляет новую книгу в таблицу book
+     *
      * @param book объект книги
      */
     public Book insertBook(Book book) {
-        Integer id = jdbcTemplate.queryForObject("SELECT MAX(id) FROM book", Integer.class);
-        if (id != null) ++id;
-        else id = 1;
-        jdbcTemplate.update("INSERT INTO book VALUES (?,?,?,?)", id, book.getTitle(), book.getAuthor(), book.getDescription());
+        jdbcTemplate.update("INSERT INTO book VALUES (?,?,?,?)",
+                ++id, book.getTitle(), book.getAuthor(), book.getDescription());
         book.setId(id);
         return book;
     }
 
     /**
-     * Возвращает список книг отсортированных по автору
+     * Возвращает список книг сгруппированных по автору
      */
-    public List<Book> selectAllBooksByAuthor() {
-        return jdbcTemplate.query("SELECT * FROM book ORDER BY author", new BookMapper());
+    public Map<String, List<Book>> selectAllBooksByAuthor() {
+        return jdbcTemplate.query("SELECT * FROM book", new BookMapper()).stream()
+                .collect(Collectors.groupingBy(Book::getAuthor));
     }
 
     /**
@@ -53,27 +56,17 @@ public class BookDAO {
      *
      * @param symbol символ для поиска в названии книги
      */
-    public List<Pair<String, Integer>> selectAuthorsByParam(char symbol) {
-        List<Book> books = selectAllBooksByAuthor();
-        int counter = 0;
-        List<Pair<String, Integer>> authors = new ArrayList<>();
-        for (int i = 0; i < books.size(); i++) {
-            counter += books.get(i).getTitle().chars()
-                    .filter(ch -> ch == Character.toLowerCase(symbol) || ch == Character.toUpperCase(symbol))
-                    .count();
-            if (i < books.size() - 1) {
-                if (!Objects.equals(books.get(i).getAuthor(), books.get(i + 1).getAuthor())) {
-                    authors.add(new Pair<>(books.get(i).getAuthor(), counter));
-                    counter = 0;
-                }
-            } else {
-                authors.add(new Pair<>(books.get(i).getAuthor(), counter));
-            }
-        }
-        return authors.stream()
-                .sorted((o1, o2) -> o2.getValue().compareTo(o1.getValue()))
-                .filter(o -> o.getValue() > 0)
+    public Map<String, Long> selectAuthorsByParam(char symbol) {
+        return jdbcTemplate.query("SELECT * FROM book", new BookMapper()).stream()
+                .collect(
+                        Collectors.groupingBy(Book::getAuthor,
+                        Collectors.summingLong(book -> book.getTitle().chars()
+                                .filter(ch -> ch == Character.toLowerCase(symbol) || ch == Character.toUpperCase(symbol))
+                                .count())))
+                .entrySet().stream()
+                .filter(m -> m.getValue() > 0)
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .limit(10)
-                .collect(Collectors.toList());
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (m1, m2) -> m1, LinkedHashMap::new));
     }
 }

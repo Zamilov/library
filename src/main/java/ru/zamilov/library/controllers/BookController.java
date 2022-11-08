@@ -1,6 +1,5 @@
 package ru.zamilov.library.controllers;
 
-import javafx.util.Pair;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -8,6 +7,7 @@ import ru.zamilov.library.dao.BookDAO;
 import ru.zamilov.library.models.Book;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/books")
@@ -30,12 +30,12 @@ public class BookController {
     }
 
     @GetMapping("/show-by-author")
-    public ResponseEntity<List<Book>> getAllBooksByAuthor() {
+    public ResponseEntity<Map<String, List<Book>>> getAllBooksByAuthor() {
         return ResponseEntity.ok(bookDAO.selectAllBooksByAuthor());
     }
 
     @GetMapping("/show-authors")
-    public ResponseEntity<List<Pair<String, Integer>>> getAuthors(@RequestParam char symbol) {
+    public ResponseEntity<Map<String, Long>> getAuthors(@RequestParam char symbol) {
         return ResponseEntity.ok(bookDAO.selectAuthorsByParam(symbol));
     }
 }
