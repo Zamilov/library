@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 @Component
 public class BookDAO {
     private final JdbcTemplate jdbcTemplate;
-    private static Integer id;
+    private Integer id;
 
     public BookDAO(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -35,7 +35,7 @@ public class BookDAO {
      *
      * @param book объект книги
      */
-    public Book insertBook(Book book) {
+    public synchronized Book insertBook(Book book) {
         jdbcTemplate.update("INSERT INTO book VALUES (?,?,?,?)",
                 ++id, book.getTitle(), book.getAuthor(), book.getDescription());
         book.setId(id);
@@ -60,9 +60,9 @@ public class BookDAO {
         return jdbcTemplate.query("SELECT * FROM book", new BookMapper()).stream()
                 .collect(
                         Collectors.groupingBy(Book::getAuthor,
-                        Collectors.summingLong(book -> book.getTitle().chars()
-                                .filter(ch -> ch == Character.toLowerCase(symbol) || ch == Character.toUpperCase(symbol))
-                                .count())))
+                                Collectors.summingLong(book -> book.getTitle().chars()
+                                        .filter(ch -> ch == Character.toLowerCase(symbol) || ch == Character.toUpperCase(symbol))
+                                        .count())))
                 .entrySet().stream()
                 .filter(m -> m.getValue() > 0)
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
